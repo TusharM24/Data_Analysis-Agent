@@ -21,10 +21,35 @@ export interface DatasetSummary {
   head_preview: Record<string, unknown>[];
 }
 
+// Dataset Versioning Types
+
+export interface DatasetVersion {
+  version_id: string;
+  version_number: number;
+  file_path: string;
+  summary: DatasetSummary;
+  change_description: string;
+  created_at: string;
+  // Frontend-only field for user-customizable display name
+  displayName?: string;
+}
+
+export interface VersionListResponse {
+  versions: DatasetVersion[];
+  current_version_id: string;
+}
+
+export interface SwitchVersionResponse {
+  success: boolean;
+  current_version: DatasetVersion;
+  message: string;
+}
+
 export interface UploadResponse {
   session_id: string;
   summary: DatasetSummary;
   message: string;
+  version?: DatasetVersion;
 }
 
 export interface ChatMessage {
@@ -43,6 +68,7 @@ export interface ChatResponse {
   plots: string[];
   execution_result?: Record<string, unknown>;
   error?: string;
+  new_version?: DatasetVersion;
 }
 
 export interface SessionInfo {
@@ -51,6 +77,8 @@ export interface SessionInfo {
   created_at: string;
   message_count: number;
   summary?: DatasetSummary;
+  version_count?: number;
+  current_version_id?: string;
 }
 
 // UI State Types
@@ -63,3 +91,7 @@ export interface AppState {
   error: string | null;
 }
 
+// Version display name storage (frontend only)
+export interface VersionDisplayNames {
+  [versionId: string]: string;
+}

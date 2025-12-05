@@ -187,6 +187,7 @@ export function ChatInterface() {
     updateMessage,
     setLoading,
     addPlots,
+    addVersion,
   } = useAppStore();
 
   const [input, setInput] = useState('');
@@ -242,6 +243,11 @@ export function ChatInterface() {
 
       if (response.plots?.length) {
         addPlots(response.plots);
+      }
+
+      // Handle new dataset version if created
+      if (response.new_version) {
+        addVersion(response.new_version);
       }
     } catch (err) {
       updateMessage(assistantId, {

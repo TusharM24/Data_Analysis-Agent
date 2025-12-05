@@ -1,10 +1,16 @@
-"""File upload router."""
+"""File upload and version management router."""
 import os
 import aiofiles
 import pandas as pd
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from ..config import settings
-from ..models import UploadResponse
+from ..models import (
+    UploadResponse, 
+    VersionListResponse, 
+    SwitchVersionRequest, 
+    SwitchVersionResponse,
+    DatasetVersion
+)
 from ..services.summary import DatasetAnalyzer
 from ..services.session import session_manager
 
@@ -16,7 +22,7 @@ async def upload_file(file: UploadFile = File(...)):
     """
     Upload a CSV or Excel file and create a new analysis session.
     
-    Returns session ID and dataset summary.
+    Returns session ID, dataset summary, and initial version info.
     """
     # Validate file type
     filename = file.filename or "unknown"
@@ -63,7 +69,7 @@ async def upload_file(file: UploadFile = File(...)):
         # Convert to dict for session storage
         summary_dict = summary.model_dump()
         
-        # Create session
+        # Create session (this also creates v1)
         session = session_manager.create_session(
             dataset_path=file_path,
             dataset_filename=filename,
@@ -71,16 +77,29 @@ async def upload_file(file: UploadFile = File(...)):
         )
         
         # Rename file to use session ID
-        new_path = os.path.join(settings.upload_dir, f"{session.session_id}.{extension}")
+        new_path = os.path.join(settings.upload_dir, f"{session.session_id}_v1.{extension}")
         os.rename(file_path, new_path)
         
-        # Update session with new path
-        session.dataset_path = new_path
+        # Update the version's file path
+        if session.versions:
+            session.versions[0].file_path = new_path
+        
+        # Get the initial version for response
+        initial_version = session.get_current_version()
+        version_response = DatasetVersion(
+            version_id=initial_version.version_id,
+            version_number=initial_version.version_number,
+            file_path=initial_version.file_path,
+            summary=summary,
+            change_description=initial_version.change_description,
+            created_at=initial_version.created_at
+        ) if initial_version else None
         
         return UploadResponse(
             session_id=session.session_id,
             summary=summary,
-            message=f"Successfully uploaded {filename}. You can now ask questions about your data!"
+            message=f"Successfully uploaded {filename}. You can now ask questions about your data!",
+            version=version_response
         )
         
     except pd.errors.EmptyDataError:
@@ -95,6 +114,73 @@ async def upload_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 
+# ==================== Version Management Endpoints ====================
+
+@router.get("/versions/{session_id}", response_model=VersionListResponse)
+async def list_versions(session_id: str):
+    """List all dataset versions for a session."""
+    session = session_manager.get_session(session_id)
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Convert internal versions to API model
+    versions = []
+    for v in session.versions:
+        # Re-create summary model from dict
+        summary_model = DatasetAnalyzer.dict_to_summary(v.summary)
+        versions.append(DatasetVersion(
+            version_id=v.version_id,
+            version_number=v.version_number,
+            file_path=v.file_path,
+            summary=summary_model,
+            change_description=v.change_description,
+            created_at=v.created_at
+        ))
+    
+    return VersionListResponse(
+        versions=versions,
+        current_version_id=session.current_version_id
+    )
+
+
+@router.post("/switch-version", response_model=SwitchVersionResponse)
+async def switch_version(request: SwitchVersionRequest):
+    """Switch to a different dataset version."""
+    session = session_manager.get_session(request.session_id)
+    
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Attempt to switch
+    success = session.switch_version(request.version_id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Version {request.version_id} not found"
+        )
+    
+    # Get the new current version
+    current = session.get_current_version()
+    summary_model = DatasetAnalyzer.dict_to_summary(current.summary)
+    
+    return SwitchVersionResponse(
+        success=True,
+        current_version=DatasetVersion(
+            version_id=current.version_id,
+            version_number=current.version_number,
+            file_path=current.file_path,
+            summary=summary_model,
+            change_description=current.change_description,
+            created_at=current.created_at
+        ),
+        message=f"Switched to version {current.version_number}: {current.change_description}"
+    )
+
+
+# ==================== Session Management Endpoints ====================
+
 @router.get("/sessions")
 async def list_sessions():
     """List all active sessions."""
@@ -103,35 +189,43 @@ async def list_sessions():
 
 @router.get("/session/{session_id}")
 async def get_session(session_id: str):
-    """Get information about a specific session."""
+    """Get information about a specific session including versions."""
     session = session_manager.get_session(session_id)
     
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
+    
+    current_version = session.get_current_version()
     
     return {
         "session_id": session.session_id,
         "dataset_filename": session.dataset_filename,
         "created_at": session.created_at.isoformat(),
         "message_count": len(session.messages),
-        "summary": session.summary
+        "summary": session.summary,
+        "version_count": len(session.versions),
+        "current_version_id": session.current_version_id,
+        "current_version_number": current_version.version_number if current_version else 1
     }
 
 
 @router.delete("/session/{session_id}")
 async def delete_session(session_id: str):
-    """Delete a session and its associated data."""
+    """Delete a session and all its associated data (including version files)."""
     session = session_manager.get_session(session_id)
     
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Delete uploaded file
-    if os.path.exists(session.dataset_path):
-        os.remove(session.dataset_path)
+    # Delete all version files
+    for version in session.versions:
+        if os.path.exists(version.file_path):
+            try:
+                os.remove(version.file_path)
+            except:
+                pass
     
     # Delete session
     session_manager.delete_session(session_id)
     
-    return {"message": "Session deleted successfully"}
-
+    return {"message": "Session and all versions deleted successfully"}

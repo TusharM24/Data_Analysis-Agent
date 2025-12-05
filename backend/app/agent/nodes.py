@@ -1,6 +1,6 @@
-"""LangGraph node implementations for the EDA agent."""
+"""LangGraph node implementations for the EDA agent with retry support."""
 import re
-from typing import Dict, Any
+from typing import Dict, Any, List
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 from ..config import settings
@@ -12,6 +12,9 @@ from .prompts import (
     RESULT_FORMATTING_PROMPT,
     ERROR_RECOVERY_PROMPT
 )
+
+# Maximum retries (should match workflow.py)
+MAX_RETRIES = 3
 
 
 class AgentNodes:
@@ -99,6 +102,7 @@ class AgentNodes:
             state['validation_failed'] = True
         else:
             state['validation_failed'] = False
+            state['error'] = None  # Clear any previous error
         
         return state
     
@@ -122,6 +126,8 @@ class AgentNodes:
         
         if not result.get('success'):
             state['error'] = result.get('error')
+        else:
+            state['error'] = None  # Clear error on success
         
         return state
     
@@ -135,11 +141,17 @@ class AgentNodes:
         execution_result = state.get('execution_result', {})
         plots = state.get('plots', [])
         error = state.get('error')
+        retry_count = state.get('retry_count', 0)
+        
+        # Add retry info to output if retries were needed
+        retry_info = ""
+        if retry_count > 0:
+            retry_info = f"\n(Note: Successfully completed after {retry_count} retry attempt(s))"
         
         prompt = RESULT_FORMATTING_PROMPT.format(
             user_request=user_message,
             code=code,
-            output=execution_result.get('output', 'No output'),
+            output=execution_result.get('output', 'No output') + retry_info,
             plots=f"{len(plots)} plot(s) generated" if plots else "No plots",
             error=error or "None"
         )
@@ -156,6 +168,7 @@ class AgentNodes:
     def handle_error(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
         Error recovery node: Try to fix and regenerate code.
+        Supports up to MAX_RETRIES attempts with context from previous failures.
         """
         error = state.get('error', '')
         code = state.get('generated_code', '')
@@ -163,18 +176,40 @@ class AgentNodes:
         user_message = messages[-1].get('content', '') if isinstance(messages[-1], dict) else messages[-1].content
         dataset_info = state.get('dataset_info', {})
         
-        # Only attempt recovery once
-        if state.get('recovery_attempted'):
-            state['response'] = f"I encountered an error and couldn't recover: {error}\n\nPlease try rephrasing your request or check if the columns you mentioned exist in the dataset."
+        # Get current retry count and history
+        retry_count = state.get('retry_count', 0)
+        previous_errors = state.get('previous_errors', [])
+        previous_codes = state.get('previous_codes', [])
+        
+        # Check if we've exceeded retry limit
+        if retry_count >= MAX_RETRIES:
+            state['response'] = self._format_final_error(error, previous_errors, user_message)
             return state
         
-        state['recovery_attempted'] = True
+        # Save current error and code to history
+        if error and error not in previous_errors:
+            previous_errors.append(error)
+        if code and code not in previous_codes:
+            previous_codes.append(code)
         
-        prompt = ERROR_RECOVERY_PROMPT.format(
+        state['previous_errors'] = previous_errors
+        state['previous_codes'] = previous_codes
+        
+        # Increment retry counter
+        retry_count += 1
+        state['retry_count'] = retry_count
+        
+        print(f"🔄 Retry attempt {retry_count}/{MAX_RETRIES} - Error: {error[:100]}...")
+        
+        # Build enhanced error recovery prompt with history
+        prompt = self._build_retry_prompt(
             error=error,
             code=code,
-            dataset_info=self._format_dataset_info(dataset_info),
-            user_request=user_message
+            dataset_info=dataset_info,
+            user_message=user_message,
+            previous_errors=previous_errors,
+            previous_codes=previous_codes,
+            retry_count=retry_count
         )
         
         response = self.llm.invoke([
@@ -185,9 +220,111 @@ class AgentNodes:
         # Extract corrected code
         corrected_code = self._extract_code(response.content)
         state['generated_code'] = corrected_code
-        state['error'] = None
+        state['error'] = None  # Clear error to allow retry
+        state['validation_failed'] = False
         
         return state
+    
+    def _build_retry_prompt(
+        self,
+        error: str,
+        code: str,
+        dataset_info: Dict[str, Any],
+        user_message: str,
+        previous_errors: List[str],
+        previous_codes: List[str],
+        retry_count: int
+    ) -> str:
+        """Build an enhanced prompt for error recovery with context from previous attempts."""
+        
+        # Base error recovery prompt
+        base_prompt = ERROR_RECOVERY_PROMPT.format(
+            error=error,
+            code=code,
+            dataset_info=self._format_dataset_info(dataset_info),
+            user_request=user_message
+        )
+        
+        # Add context about previous attempts if this isn't the first retry
+        if retry_count > 1 and len(previous_errors) > 1:
+            history_context = "\n\nPREVIOUS FAILED ATTEMPTS:\n"
+            for i, (prev_err, prev_code) in enumerate(zip(previous_errors[:-1], previous_codes[:-1]), 1):
+                history_context += f"\n--- Attempt {i} ---\n"
+                history_context += f"Error: {prev_err[:200]}\n"
+                history_context += f"Code snippet: {prev_code[:300]}...\n"
+            
+            base_prompt += history_context
+            base_prompt += f"\n\nThis is attempt {retry_count}/{MAX_RETRIES}. "
+            base_prompt += "Try a DIFFERENT approach than the previous attempts. "
+            base_prompt += "Consider using alternative methods or libraries."
+        
+        # Add specific hints based on common error patterns
+        hints = self._get_error_hints(error)
+        if hints:
+            base_prompt += f"\n\nHINTS FOR THIS ERROR:\n{hints}"
+        
+        return base_prompt
+    
+    def _get_error_hints(self, error: str) -> str:
+        """Get specific hints based on the error message."""
+        hints = []
+        error_lower = error.lower()
+        
+        if 'sparse_output' in error_lower or 'sparse' in error_lower:
+            hints.append("- For OneHotEncoder, use sparse_output=False instead of sparse=False (sklearn >= 1.2)")
+            hints.append("- Alternative: Use pd.get_dummies(df, columns=['col']) for simpler one-hot encoding")
+        
+        if 'keyerror' in error_lower or 'not in index' in error_lower:
+            hints.append("- Check column name spelling and case sensitivity")
+            hints.append("- Use df.columns.tolist() to see available columns")
+        
+        if 'length' in error_lower or 'shape' in error_lower or 'mismatch' in error_lower:
+            hints.append("- Ensure x and y have the same length for plotting")
+            hints.append("- For countplot, use: sns.countplot(x='column', data=df) or sns.countplot(x=df['column'])")
+            hints.append("- Don't mix value_counts() index with full dataframe in same plot")
+        
+        if 'nan' in error_lower or 'null' in error_lower or 'missing' in error_lower:
+            hints.append("- Use .dropna() or .fillna() before operations that can't handle NaN")
+            hints.append("- Check for missing values: df['col'].isna().sum()")
+        
+        if 'dtype' in error_lower or 'type' in error_lower:
+            hints.append("- Convert column types explicitly: df['col'].astype(str) or pd.to_numeric()")
+            hints.append("- For LabelEncoder, convert to string first: le.fit_transform(df['col'].astype(str))")
+        
+        if 'memory' in error_lower:
+            hints.append("- Reduce data size: use .head(1000) for testing")
+            hints.append("- Process in chunks if dataset is large")
+        
+        if 'seaborn' in error_lower or 'countplot' in error_lower or 'barplot' in error_lower:
+            hints.append("- For top N values: sns.countplot(x='col', data=df, order=df['col'].value_counts().head(N).index)")
+            hints.append("- Don't pass both x=series and data=df when they don't align")
+        
+        return "\n".join(hints) if hints else ""
+    
+    def _format_final_error(self, error: str, previous_errors: List[str], user_message: str) -> str:
+        """Format the final error message after all retries failed."""
+        response = f"""I apologize, but I wasn't able to complete your request after {MAX_RETRIES} attempts.
+
+**Your request:** {user_message}
+
+**Final error:** {error}
+
+**What I tried:**
+"""
+        for i, err in enumerate(previous_errors, 1):
+            response += f"\n{i}. Attempt failed with: {err[:150]}..."
+        
+        response += """
+
+**Suggestions:**
+- Try rephrasing your request to be more specific
+- Check if the column names you mentioned exist in the dataset
+- Try breaking down complex requests into simpler steps
+- For visualization issues, try specifying the exact chart type you want
+
+Would you like to try a different approach?"""
+        
+        return response
     
     def _build_conversation_context(self, messages: list, max_messages: int = 6) -> str:
         """Build conversation context from message history."""
@@ -270,4 +407,3 @@ class AgentNodes:
                 code_lines.append(line)
         
         return '\n'.join(code_lines).strip()
-

@@ -19,7 +19,7 @@ export function FileUpload() {
 
       try {
         const response = await uploadFile(file);
-        setSession(response.session_id, response.summary);
+        setSession(response.session_id, response.summary, response.version);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to upload file';
         setError(message);

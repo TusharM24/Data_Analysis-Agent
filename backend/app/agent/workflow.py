@@ -1,9 +1,12 @@
-"""LangGraph workflow definition for the EDA agent."""
+"""LangGraph workflow definition for the EDA agent with retry support."""
 from typing import Dict, Any, TypedDict, List, Annotated
 from langgraph.graph import StateGraph, END
 from langchain_core.messages import BaseMessage
 import operator
 from .nodes import AgentNodes
+
+# Maximum number of retry attempts
+MAX_RETRIES = 3
 
 
 class AgentState(TypedDict):
@@ -19,7 +22,10 @@ class AgentState(TypedDict):
     plots: List[str]
     error: str
     response: str
-    recovery_attempted: bool
+    retry_count: int  # Number of retry attempts (0 = first try, max = 3)
+    previous_errors: List[str]  # History of errors for context
+    previous_codes: List[str]  # History of failed codes
+    new_version: Dict[str, Any]  # Info about newly created dataset version
 
 
 def create_agent_workflow():
@@ -33,7 +39,7 @@ def create_agent_workflow():
     4. execute_code - Run code in sandbox
     5. format_response - Format results for the user
     
-    Plus an error recovery node for handling failures.
+    Plus an error recovery node that retries up to 3 times.
     """
     # Initialize nodes
     nodes = AgentNodes()
@@ -76,7 +82,10 @@ def create_agent_workflow():
     # execute_code -> format_response OR handle_error
     def route_after_execution(state: AgentState) -> str:
         execution_result = state.get('execution_result', {})
-        if not execution_result.get('success') and not state.get('recovery_attempted'):
+        retry_count = state.get('retry_count', 0)
+        
+        # If execution failed and we haven't exceeded retry limit, try to recover
+        if not execution_result.get('success') and retry_count < MAX_RETRIES:
             return "handle_error"
         return "format_response"
     
@@ -91,7 +100,11 @@ def create_agent_workflow():
     
     # handle_error -> validate_code (retry) OR format_response (give up)
     def route_after_error(state: AgentState) -> str:
-        if state.get('recovery_attempted') and state.get('generated_code'):
+        retry_count = state.get('retry_count', 0)
+        generated_code = state.get('generated_code', '')
+        
+        # If we have new code and haven't exceeded retries, try again
+        if generated_code and retry_count <= MAX_RETRIES:
             return "validate_code"
         return "format_response"
     
@@ -155,17 +168,25 @@ async def run_agent(
         'plots': [],
         'error': '',
         'response': '',
-        'recovery_attempted': False
+        'retry_count': 0,
+        'previous_errors': [],
+        'previous_codes': [],
+        'new_version': None
     }
     
     # Run the workflow
     final_state = workflow.invoke(initial_state)
     
+    # Extract new_version from execution_result if present
+    execution_result = final_state.get('execution_result', {})
+    new_version = execution_result.get('new_version') if execution_result else None
+    
     return {
         'response': final_state.get('response', ''),
         'code': final_state.get('generated_code', ''),
         'plots': final_state.get('plots', []),
-        'execution_result': final_state.get('execution_result', {}),
-        'error': final_state.get('error')
+        'execution_result': execution_result,
+        'error': final_state.get('error'),
+        'new_version': new_version,
+        'retry_count': final_state.get('retry_count', 0)  # Include for debugging
     }
-

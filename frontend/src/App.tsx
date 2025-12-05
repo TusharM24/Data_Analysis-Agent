@@ -8,7 +8,7 @@ import {
   Github,
   Sparkles,
 } from 'lucide-react';
-import { FileUpload, DatasetSummary, ChatInterface, PlotGallery } from './components';
+import { FileUpload, DatasetSummary, ChatInterface, PlotGallery, VersionSelector } from './components';
 import { useAppStore } from './lib/store';
 import { cn } from './lib/utils';
 
@@ -178,11 +178,16 @@ function App() {
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col lg:flex-row min-h-0"
               >
-                {/* Left Panel - Dataset Summary & Plot Gallery */}
-                <div className="w-full lg:w-80 xl:w-96 border-b lg:border-b-0 lg:border-r border-surface-800/50 flex flex-col bg-surface-900/50">
+                {/* Left Panel - Dataset Summary, Versions & Plot Gallery */}
+                <div className="w-full lg:w-80 xl:w-96 border-b lg:border-b-0 lg:border-r border-surface-800/50 flex flex-col bg-surface-900/50 overflow-y-auto">
                   {/* Dataset Summary */}
-                  <div className="p-4 border-b border-surface-800/50 max-h-[40vh] lg:max-h-none overflow-y-auto">
+                  <div className="p-4 border-b border-surface-800/50">
                     {summary && <DatasetSummary summary={summary} />}
+                  </div>
+
+                  {/* Version Selector */}
+                  <div className="p-4 border-b border-surface-800/50">
+                    <VersionSelector />
                   </div>
 
                   {/* Plot Gallery */}

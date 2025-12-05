@@ -1,5 +1,11 @@
 import axios from 'axios';
-import type { UploadResponse, ChatResponse, SessionInfo } from '../types';
+import type { 
+  UploadResponse, 
+  ChatResponse, 
+  SessionInfo, 
+  VersionListResponse, 
+  SwitchVersionResponse 
+} from '../types';
 
 const API_BASE = '/api';
 
@@ -55,6 +61,8 @@ export async function getChatHistory(sessionId: string): Promise<{
   messages: Array<{ role: string; content: string }>;
   code_history: string[];
   plots: string[];
+  version_count: number;
+  current_version_id: string;
 }> {
   const response = await api.get(`/history/${sessionId}`);
   return response.data;
@@ -64,6 +72,28 @@ export async function clearHistory(sessionId: string): Promise<void> {
   await api.post(`/clear/${sessionId}`);
 }
 
+// ==================== Version Management ====================
+
+// Get all versions for a session
+export async function getVersions(sessionId: string): Promise<VersionListResponse> {
+  const response = await api.get<VersionListResponse>(`/versions/${sessionId}`);
+  return response.data;
+}
+
+// Switch to a different version
+export async function switchVersion(
+  sessionId: string, 
+  versionId: string
+): Promise<SwitchVersionResponse> {
+  const response = await api.post<SwitchVersionResponse>('/switch-version', {
+    session_id: sessionId,
+    version_id: versionId,
+  });
+  return response.data;
+}
+
+// ==================== Utilities ====================
+
 // Get plot URL
 export function getPlotUrl(plotPath: string): string {
   if (plotPath.startsWith('/api/')) {
@@ -71,4 +101,3 @@ export function getPlotUrl(plotPath: string): string {
   }
   return `${API_BASE}${plotPath}`;
 }
-

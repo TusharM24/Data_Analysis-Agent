@@ -35,11 +35,22 @@ class DatasetSummary(BaseModel):
     head_preview: List[Dict[str, Any]]
 
 
+class DatasetVersion(BaseModel):
+    """Represents a version of the dataset."""
+    version_id: str
+    version_number: int
+    file_path: str
+    summary: DatasetSummary
+    change_description: str  # "Original upload" or "Removed nulls, added column X"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class UploadResponse(BaseModel):
     """Response from file upload endpoint."""
     session_id: str
     summary: DatasetSummary
     message: str
+    version: Optional[DatasetVersion] = None
 
 
 class ChatMessage(BaseModel):
@@ -64,6 +75,26 @@ class ChatResponse(BaseModel):
     plots: List[str] = []
     execution_result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    new_version: Optional[DatasetVersion] = None  # If a new version was created
+
+
+class VersionListResponse(BaseModel):
+    """Response for listing dataset versions."""
+    versions: List[DatasetVersion]
+    current_version_id: str
+
+
+class SwitchVersionRequest(BaseModel):
+    """Request to switch dataset version."""
+    session_id: str
+    version_id: str
+
+
+class SwitchVersionResponse(BaseModel):
+    """Response after switching version."""
+    success: bool
+    current_version: DatasetVersion
+    message: str
 
 
 class SessionInfo(BaseModel):
@@ -72,6 +103,8 @@ class SessionInfo(BaseModel):
     dataset_filename: str
     created_at: datetime
     message_count: int
+    version_count: int = 1
+    current_version_id: Optional[str] = None
 
 
 class AgentState(BaseModel):
@@ -84,7 +117,7 @@ class AgentState(BaseModel):
     execution_result: Optional[Dict[str, Any]] = None
     plots: List[str] = []
     error: Optional[str] = None
+    new_version: Optional[Dict[str, Any]] = None  # If transformation created new version
     
     class Config:
         arbitrary_types_allowed = True
-

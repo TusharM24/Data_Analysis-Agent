@@ -133,4 +133,31 @@ class DatasetAnalyzer:
         
         corr_matrix = numerical_df.corr()
         return corr_matrix.to_dict()
+    
+    @staticmethod
+    def dict_to_summary(data: Dict[str, Any]) -> DatasetSummary:
+        """Convert a dictionary back to DatasetSummary model."""
+        # Convert column dicts to ColumnInfo objects
+        columns = [
+            ColumnInfo(**col) if isinstance(col, dict) else col
+            for col in data.get('columns', [])
+        ]
+        
+        return DatasetSummary(
+            filename=data.get('filename', 'unknown'),
+            shape=tuple(data.get('shape', (0, 0))),
+            columns=columns,
+            numerical_columns=data.get('numerical_columns', []),
+            categorical_columns=data.get('categorical_columns', []),
+            datetime_columns=data.get('datetime_columns', []),
+            missing_values=data.get('missing_values', {}),
+            memory_usage=data.get('memory_usage', '0 bytes'),
+            head_preview=data.get('head_preview', [])
+        )
+    
+    @staticmethod
+    def analyze_from_path(file_path: str, filename: str) -> DatasetSummary:
+        """Analyze a dataset from a file path."""
+        df = pd.read_csv(file_path)
+        return DatasetAnalyzer.analyze(df, filename)
 

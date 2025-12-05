@@ -1,4 +1,4 @@
-"""Secure code execution sandbox."""
+"""Secure code execution sandbox with dataset versioning support."""
 import subprocess
 import tempfile
 import os
@@ -14,6 +14,7 @@ class CodeSandbox:
     """
     Executes Python code in a sandboxed environment.
     Uses subprocess isolation with strict timeouts and output capture.
+    Supports dataset versioning through save_dataframe() function.
     """
     
     # Forbidden patterns that should never appear in generated code
@@ -49,6 +50,11 @@ class CodeSandbox:
         'plotly', 'plotly.express', 'px', 'plotly.graph_objects', 'go',
         'scipy', 'scipy.stats',
         'sklearn', 'scikit-learn',
+        'sklearn.preprocessing',
+        'sklearn.impute',
+        'sklearn.feature_selection',
+        'sklearn.model_selection',
+        'sklearn.metrics',
         'statsmodels',
         'json',
         'math',
@@ -56,11 +62,17 @@ class CodeSandbox:
         'datetime',
         'collections',
         're',
+        'Counter',
     }
     
-    def __init__(self, plots_dir: str = None):
+    # Marker used to detect version saves in output
+    VERSION_SAVED_MARKER = "__VERSION_SAVED__"
+    
+    def __init__(self, plots_dir: str = None, versions_dir: str = None):
         self.plots_dir = plots_dir or settings.plots_dir
+        self.versions_dir = versions_dir or os.path.join(settings.upload_dir, "versions")
         os.makedirs(self.plots_dir, exist_ok=True)
+        os.makedirs(self.versions_dir, exist_ok=True)
     
     def validate_code(self, code: str) -> Tuple[bool, Optional[str]]:
         """
@@ -108,7 +120,7 @@ class CodeSandbox:
             session_id: Session ID for plot naming
             
         Returns:
-            Dictionary with execution results
+            Dictionary with execution results, including new_version if created
         """
         # Validate first
         is_valid, error = self.validate_code(code)
@@ -117,23 +129,31 @@ class CodeSandbox:
                 'success': False,
                 'error': error,
                 'output': None,
-                'plots': []
+                'plots': [],
+                'new_version': None
             }
         
         # Convert paths to absolute to avoid working directory issues
         abs_dataset_path = os.path.abspath(dataset_path)
         abs_plots_dir = os.path.abspath(self.plots_dir)
+        abs_versions_dir = os.path.abspath(self.versions_dir)
         
-        # Generate unique plot filename prefix
-        plot_id = str(uuid.uuid4())[:8]
-        plot_prefix = f"{session_id}_{plot_id}"
-        plot_path = os.path.join(abs_plots_dir, f"{plot_prefix}.png")
+        # Generate unique IDs for plots and potential new version
+        execution_id = str(uuid.uuid4())[:8]
+        plot_prefix = f"{session_id}_{execution_id}"
+        version_path = os.path.join(abs_versions_dir, f"{session_id}_{execution_id}.csv")
         
         # Get existing plots before execution
         existing_plots = self._get_existing_plots()
         
         # Create execution script with absolute paths
-        script = self._create_execution_script(code, abs_dataset_path, plot_path, plot_prefix, abs_plots_dir)
+        script = self._create_execution_script(
+            code, 
+            abs_dataset_path, 
+            plot_prefix, 
+            abs_plots_dir,
+            version_path
+        )
         
         # Write script to temp file
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
@@ -172,6 +192,20 @@ class CodeSandbox:
             new_plots.sort(key=lambda x: os.path.getmtime(x), reverse=True)
             new_plots = new_plots[:10]  # Limit to 10 plots max
             
+            # Check if a new version was saved
+            new_version = None
+            if self.VERSION_SAVED_MARKER in output:
+                # Parse version info from output
+                version_match = re.search(
+                    rf'{self.VERSION_SAVED_MARKER}:(.+?):(.+?)(?:\n|$)', 
+                    output
+                )
+                if version_match and os.path.exists(version_path):
+                    new_version = {
+                        'file_path': version_path,
+                        'description': version_match.group(2).strip()
+                    }
+            
             # Try to extract JSON result from output
             result_data = None
             if output:
@@ -190,7 +224,8 @@ class CodeSandbox:
                     'success': False,
                     'error': error_output or "Code execution failed",
                     'output': output,
-                    'plots': new_plots
+                    'plots': new_plots,
+                    'new_version': new_version
                 }
             
             return {
@@ -198,7 +233,8 @@ class CodeSandbox:
                 'error': None,
                 'output': output,
                 'result': result_data,
-                'plots': new_plots
+                'plots': new_plots,
+                'new_version': new_version
             }
             
         except subprocess.TimeoutExpired:
@@ -206,14 +242,16 @@ class CodeSandbox:
                 'success': False,
                 'error': f"Code execution timed out after {settings.execution_timeout} seconds",
                 'output': None,
-                'plots': []
+                'plots': [],
+                'new_version': None
             }
         except Exception as e:
             return {
                 'success': False,
                 'error': str(e),
                 'output': None,
-                'plots': []
+                'plots': [],
+                'new_version': None
             }
         finally:
             # Cleanup temp file
@@ -224,24 +262,78 @@ class CodeSandbox:
         self, 
         code: str, 
         dataset_path: str, 
-        plot_path: str,
         plot_prefix: str,
-        plots_dir: str
+        plots_dir: str,
+        version_path: str
     ) -> str:
         """Create the execution script with necessary imports and setup."""
         return f'''
 import warnings
 warnings.filterwarnings('ignore')
 
+# Core data libraries
 import pandas as pd
 import numpy as np
+import json
+import os
+from datetime import datetime
+import re
+from collections import Counter
+
+# Visualization
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
-import json
-import os
-from datetime import datetime
+
+# Scikit-learn preprocessing
+from sklearn.preprocessing import (
+    StandardScaler,
+    MinMaxScaler,
+    RobustScaler,
+    MaxAbsScaler,
+    Normalizer,
+    LabelEncoder,
+    OrdinalEncoder,
+    OneHotEncoder,
+    Binarizer,
+    PolynomialFeatures,
+    PowerTransformer,
+    QuantileTransformer,
+    FunctionTransformer
+)
+
+# Scikit-learn imputation
+from sklearn.impute import SimpleImputer, KNNImputer
+
+# Scikit-learn feature selection
+from sklearn.feature_selection import (
+    SelectKBest,
+    chi2,
+    f_classif,
+    mutual_info_classif,
+    VarianceThreshold
+)
+
+# Scikit-learn model selection (for train/test split)
+from sklearn.model_selection import train_test_split
+
+# Scikit-learn metrics (for evaluation)
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    classification_report,
+    mean_squared_error,
+    mean_absolute_error,
+    r2_score
+)
+
+# Scipy stats for statistical transformations
+from scipy import stats
+from scipy.stats import zscore, boxcox, yeojohnson
 
 # Set plot styling
 plt.style.use('seaborn-v0_8-whitegrid')
@@ -255,7 +347,9 @@ df = pd.read_csv("{dataset_path}")
 # Plot configuration
 PLOTS_DIR = "{plots_dir}"
 PLOT_PREFIX = "{plot_prefix}"
+VERSION_PATH = "{version_path}"
 _plot_counter = [0]  # Use list to allow modification in nested function
+_version_saved = [False]  # Track if version was saved
 
 def save_plot(name=None):
     """
@@ -276,6 +370,33 @@ def save_plot(name=None):
     plt.close()
     print(f"Plot saved: {{filename}}")
     return filepath
+
+def save_dataframe(description="Transformed dataset"):
+    """
+    Save the current dataframe as a new version.
+    
+    IMPORTANT: Only call this when the user explicitly asks to transform/clean/modify the data.
+    Do NOT call for analysis-only queries.
+    
+    Args:
+        description: Brief description of changes made (e.g., "Removed null values", "Added age_group column")
+    
+    Example:
+        # User asked to clean the data
+        df = df.dropna()
+        df = df.drop_duplicates()
+        save_dataframe("Removed null values and duplicates")
+    """
+    global df
+    if _version_saved[0]:
+        print("Warning: Version already saved in this execution. Skipping duplicate save.")
+        return
+    
+    df.to_csv(VERSION_PATH, index=False)
+    _version_saved[0] = True
+    print(f"__VERSION_SAVED__:{{VERSION_PATH}}:{{description}}")
+    print(f"Dataset saved as new version: {{description}}")
+    print(f"New shape: {{df.shape[0]}} rows x {{df.shape[1]}} columns")
 
 # Helper to convert results to JSON-safe format
 def to_json_safe(obj):

@@ -2,8 +2,9 @@
 import os
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
-from ..models import ChatRequest, ChatResponse
+from ..models import ChatRequest, ChatResponse, DatasetVersion
 from ..services.session import session_manager
+from ..services.summary import DatasetAnalyzer
 from ..agent.workflow import run_agent
 from ..config import settings
 
@@ -20,6 +21,7 @@ async def chat(request: ChatRequest):
     2. Generate appropriate Python code
     3. Execute the code safely
     4. Return results and any generated visualizations
+    5. If data transformation is requested, create a new dataset version
     """
     # Get session
     session = session_manager.get_session(request.session_id)
@@ -68,12 +70,52 @@ async def chat(request: ChatRequest):
             for p in result.get('plots', [])
         ]
         
+        # Handle new version creation
+        new_version_response = None
+        new_version_info = result.get('new_version')
+        
+        if new_version_info and new_version_info.get('file_path'):
+            file_path = new_version_info['file_path']
+            description = new_version_info.get('description', 'Transformed dataset')
+            
+            # Generate summary for new version
+            try:
+                new_summary = DatasetAnalyzer.analyze_from_path(
+                    file_path, 
+                    session.dataset_filename
+                )
+                new_summary_dict = new_summary.model_dump()
+                
+                # Add version to session
+                new_version = session.add_version(
+                    file_path=file_path,
+                    summary=new_summary_dict,
+                    change_description=description
+                )
+                
+                # Create response model
+                new_version_response = DatasetVersion(
+                    version_id=new_version.version_id,
+                    version_number=new_version.version_number,
+                    file_path=new_version.file_path,
+                    summary=new_summary,
+                    change_description=new_version.change_description,
+                    created_at=new_version.created_at
+                )
+                
+                print(f"Created new dataset version: v{new_version.version_number} - {description}")
+                
+            except Exception as e:
+                print(f"Error creating new version: {e}")
+                # Don't fail the whole request if version creation fails
+        
         return ChatResponse(
             response=result.get('response', 'I encountered an issue processing your request.'),
             code=result.get('code'),
             plots=plot_urls,
             execution_result=result.get('execution_result'),
-            error=result.get('error')
+            error=result.get('error'),
+            new_version=new_version_response
         )
         
     except Exception as e:
@@ -128,13 +170,15 @@ async def get_chat_history(session_id: str):
         "session_id": session_id,
         "messages": history,
         "code_history": session.code_history,
-        "plots": [f"/api/plots/{os.path.basename(p)}" for p in session.plots]
+        "plots": [f"/api/plots/{os.path.basename(p)}" for p in session.plots],
+        "version_count": len(session.versions),
+        "current_version_id": session.current_version_id
     }
 
 
 @router.post("/clear/{session_id}")
 async def clear_history(session_id: str):
-    """Clear the chat history for a session (keeps the dataset)."""
+    """Clear the chat history for a session (keeps the dataset and versions)."""
     session = session_manager.get_session(session_id)
     
     if not session:
@@ -144,4 +188,3 @@ async def clear_history(session_id: str):
     session.code_history = []
     
     return {"message": "Chat history cleared"}
-
