@@ -1,0 +1,38 @@
+# Core Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+pydantic>=2.5.3
+pydantic-settings>=2.1.0
+
+# Data Processing
+pandas>=2.2.0
+numpy>=1.26.3
+scipy>=1.12.0
+openpyxl>=3.1.2
+xlrd>=2.0.1
+python-dateutil>=2.8.2
+
+# Visualization
+matplotlib>=3.8.2
+seaborn>=0.13.1
+plotly>=5.18.0
+kaleido>=0.2.1
+
+# Machine Learning & Stats
+scikit-learn>=1.4.0
+statsmodels>=0.14.1
+
+# LLM & Agent Framework
+langchain>=0.1.4
+langgraph>=0.0.20
+langchain-groq>=0.0.1
+langchain-core>=0.1.17
+groq>=0.4.2
+
+# Utilities
+python-dotenv>=1.0.0
+aiofiles>=23.2.1
+
+# WebSocket support
+websockets>=12.0

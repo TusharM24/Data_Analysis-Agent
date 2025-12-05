@@ -1,0 +1,196 @@
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronLeft, ChevronRight, X, Download, Maximize2 } from 'lucide-react';
+import { useState } from 'react';
+import { cn } from '../lib/utils';
+import { getPlotUrl } from '../lib/api';
+import { useAppStore } from '../lib/store';
+
+interface FullscreenModalProps {
+  plotUrl: string;
+  onClose: () => void;
+}
+
+function FullscreenModal({ plotUrl, onClose }: FullscreenModalProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="relative max-w-[90vw] max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={plotUrl}
+          alt="Plot fullscreen"
+          className="max-w-full max-h-[90vh] object-contain rounded-lg"
+        />
+        
+        <button
+          onClick={onClose}
+          className="absolute -top-2 -right-2 p-2 rounded-full bg-surface-800 border border-surface-700 text-surface-300 hover:text-white hover:bg-surface-700 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        
+        <a
+          href={plotUrl}
+          download
+          className="absolute -bottom-2 -right-2 p-2 rounded-full bg-primary-600 text-white hover:bg-primary-500 transition-colors"
+        >
+          <Download className="w-5 h-5" />
+        </a>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+export function PlotGallery() {
+  const { allPlots, selectedPlotIndex, setSelectedPlot } = useAppStore();
+  const [fullscreenPlot, setFullscreenPlot] = useState<string | null>(null);
+
+  if (allPlots.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-center p-8">
+        <div className="p-4 rounded-2xl bg-surface-800/50 mb-4">
+          <Maximize2 className="w-8 h-8 text-surface-500" />
+        </div>
+        <p className="text-surface-400 text-sm">
+          No visualizations yet
+        </p>
+        <p className="text-surface-500 text-xs mt-1">
+          Ask me to create charts or plots!
+        </p>
+      </div>
+    );
+  }
+
+  const currentPlot = allPlots[selectedPlotIndex];
+
+  const goToPrevious = () => {
+    setSelectedPlot(Math.max(0, selectedPlotIndex - 1));
+  };
+
+  const goToNext = () => {
+    setSelectedPlot(Math.min(allPlots.length - 1, selectedPlotIndex + 1));
+  };
+
+  return (
+    <div className="h-full flex flex-col">
+      {/* Main Plot Display */}
+      <div className="flex-1 relative flex items-center justify-center p-4 min-h-0">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentPlot}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="relative group max-w-full max-h-full"
+          >
+            <img
+              src={getPlotUrl(currentPlot)}
+              alt={`Plot ${selectedPlotIndex + 1}`}
+              className="max-w-full max-h-full object-contain rounded-lg border border-surface-700/50"
+            />
+            
+            {/* Hover overlay with actions */}
+            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-3">
+              <button
+                onClick={() => setFullscreenPlot(getPlotUrl(currentPlot))}
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                <Maximize2 className="w-5 h-5 text-white" />
+              </button>
+              <a
+                href={getPlotUrl(currentPlot)}
+                download
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                <Download className="w-5 h-5 text-white" />
+              </a>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Navigation Arrows */}
+        {allPlots.length > 1 && (
+          <>
+            <button
+              onClick={goToPrevious}
+              disabled={selectedPlotIndex === 0}
+              className={cn(
+                'absolute left-2 p-2 rounded-lg transition-all',
+                'bg-surface-800/80 border border-surface-700/50',
+                'hover:bg-surface-700 hover:border-surface-600',
+                'disabled:opacity-30 disabled:cursor-not-allowed'
+              )}
+            >
+              <ChevronLeft className="w-5 h-5 text-surface-300" />
+            </button>
+            
+            <button
+              onClick={goToNext}
+              disabled={selectedPlotIndex === allPlots.length - 1}
+              className={cn(
+                'absolute right-2 p-2 rounded-lg transition-all',
+                'bg-surface-800/80 border border-surface-700/50',
+                'hover:bg-surface-700 hover:border-surface-600',
+                'disabled:opacity-30 disabled:cursor-not-allowed'
+              )}
+            >
+              <ChevronRight className="w-5 h-5 text-surface-300" />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Thumbnails */}
+      {allPlots.length > 1 && (
+        <div className="p-4 border-t border-surface-800">
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {allPlots.map((plot, index) => (
+              <button
+                key={plot}
+                onClick={() => setSelectedPlot(index)}
+                className={cn(
+                  'flex-shrink-0 w-16 h-12 rounded-lg overflow-hidden border-2 transition-all',
+                  index === selectedPlotIndex
+                    ? 'border-primary-500 ring-2 ring-primary-500/30'
+                    : 'border-surface-700/50 hover:border-surface-600'
+                )}
+              >
+                <img
+                  src={getPlotUrl(plot)}
+                  alt={`Thumbnail ${index + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+          
+          {/* Counter */}
+          <p className="text-xs text-surface-500 text-center mt-2">
+            {selectedPlotIndex + 1} / {allPlots.length}
+          </p>
+        </div>
+      )}
+
+      {/* Fullscreen Modal */}
+      <AnimatePresence>
+        {fullscreenPlot && (
+          <FullscreenModal
+            plotUrl={fullscreenPlot}
+            onClose={() => setFullscreenPlot(null)}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
