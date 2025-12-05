@@ -8,7 +8,8 @@ import {
   ChevronDown, 
   ChevronUp,
   Clock,
-  Database
+  Database,
+  Download
 } from 'lucide-react';
 import { cn, formatNumber } from '../lib/utils';
 import { switchVersion } from '../lib/api';
@@ -110,15 +111,27 @@ function VersionItem({ version, isCurrent, onSelect, onRename, displayName }: Ve
                 )}>
                   v{version.version_number} - {displayName}
                 </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsEditing(true);
-                  }}
-                  className="p-1 text-surface-500 hover:text-surface-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <Pencil className="w-3 h-3" />
-                </button>
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <a
+                    href={`http://localhost:8000/api/download/${version.version_id}`}
+                    download
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1 text-surface-500 hover:text-primary-400 transition-colors"
+                    title="Download CSV"
+                  >
+                    <Download className="w-3 h-3" />
+                  </a>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsEditing(true);
+                    }}
+                    className="p-1 text-surface-500 hover:text-surface-300 transition-colors"
+                    title="Rename"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                </div>
               </>
             )}
           </div>

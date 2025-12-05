@@ -3,6 +3,7 @@ import os
 import aiofiles
 import pandas as pd
 from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
 from ..config import settings
 from ..models import (
     UploadResponse, 
@@ -229,3 +230,26 @@ async def delete_session(session_id: str):
     session_manager.delete_session(session_id)
     
     return {"message": "Session and all versions deleted successfully"}
+
+
+@router.get("/download/{version_id}")
+async def download_version(version_id: str):
+    """Download a specific dataset version as CSV."""
+    # Find the version across all sessions
+    for session in session_manager._sessions.values():
+        for version in session.versions:
+            if version.version_id == version_id:
+                if not os.path.exists(version.file_path):
+                    raise HTTPException(status_code=404, detail="Version file not found")
+                
+                # Generate download filename
+                base_name = session.dataset_filename.rsplit('.', 1)[0]
+                download_name = f"{base_name}_v{version.version_number}.csv"
+                
+                return FileResponse(
+                    path=version.file_path,
+                    filename=download_name,
+                    media_type="text/csv"
+                )
+    
+    raise HTTPException(status_code=404, detail="Version not found")

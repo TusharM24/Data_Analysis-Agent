@@ -3,9 +3,7 @@ import {
   Table2,
   Hash,
   Type,
-  Calendar,
   AlertTriangle,
-  HardDrive,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
@@ -22,32 +20,26 @@ interface StatCardProps {
   label: string;
   value: string | number;
   color: string;
-  delay?: number;
 }
 
-function StatCard({ icon, label, value, color, delay = 0 }: StatCardProps) {
+function StatCard({ icon, label, value, color }: StatCardProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.3 }}
+    <div
       className={cn(
-        'p-4 rounded-xl glass-light',
-        'hover:scale-[1.02] transition-transform duration-200'
+        'p-2.5 rounded-lg bg-surface-800/50 border border-surface-700/30',
+        'flex items-center gap-2'
       )}
     >
-      <div className="flex items-center gap-3">
-        <div className={cn('p-2 rounded-lg', color)}>
-          {icon}
-        </div>
-        <div>
-          <p className="text-sm text-surface-400">{label}</p>
-          <p className="text-xl font-display font-bold text-surface-100">
-            {typeof value === 'number' ? formatNumber(value) : value}
-          </p>
-        </div>
+      <div className={cn('p-1.5 rounded-md', color)}>
+        {icon}
       </div>
-    </motion.div>
+      <div className="min-w-0">
+        <p className="text-xs text-surface-500 truncate">{label}</p>
+        <p className="text-sm font-semibold text-surface-200">
+          {typeof value === 'number' ? formatNumber(value) : value}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -59,183 +51,147 @@ export function DatasetSummary({ summary }: Props) {
   const missingPercent = ((totalMissing / (summary.shape[0] * summary.shape[1])) * 100).toFixed(1);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="space-y-4"
-    >
+    <div className="space-y-3">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-display font-semibold text-surface-100">
-            {summary.filename}
-          </h2>
-          <p className="text-sm text-surface-400">
-            {summary.memory_usage} in memory
-          </p>
-        </div>
+      <div>
+        <h2 className="text-sm font-display font-semibold text-surface-100 truncate" title={summary.filename}>
+          {summary.filename}
+        </h2>
+        <p className="text-xs text-surface-500">
+          {summary.memory_usage}
+        </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Stats Grid - 2x2 */}
+      <div className="grid grid-cols-2 gap-2">
         <StatCard
-          icon={<Table2 className="w-5 h-5 text-primary-400" />}
+          icon={<Table2 className="w-3.5 h-3.5 text-primary-400" />}
           label="Rows"
           value={summary.shape[0]}
           color="bg-primary-500/20"
-          delay={0}
         />
         <StatCard
-          icon={<Hash className="w-5 h-5 text-accent-400" />}
+          icon={<Hash className="w-3.5 h-3.5 text-accent-400" />}
           label="Columns"
           value={summary.shape[1]}
           color="bg-accent-500/20"
-          delay={0.1}
         />
         <StatCard
-          icon={<Type className="w-5 h-5 text-emerald-400" />}
+          icon={<Type className="w-3.5 h-3.5 text-emerald-400" />}
           label="Numerical"
           value={summary.numerical_columns.length}
           color="bg-emerald-500/20"
-          delay={0.2}
         />
         <StatCard
-          icon={<AlertTriangle className="w-5 h-5 text-amber-400" />}
+          icon={<AlertTriangle className="w-3.5 h-3.5 text-amber-400" />}
           label="Missing"
           value={`${missingPercent}%`}
           color="bg-amber-500/20"
-          delay={0.3}
         />
       </div>
 
-      {/* Column Types */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="flex flex-wrap gap-2"
-      >
+      {/* Column Type Tags */}
+      <div className="flex flex-wrap gap-1.5">
         {summary.numerical_columns.length > 0 && (
-          <span className="px-3 py-1 text-xs rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-            {summary.numerical_columns.length} numerical
+          <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+            {summary.numerical_columns.length} num
           </span>
         )}
         {summary.categorical_columns.length > 0 && (
-          <span className="px-3 py-1 text-xs rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-            {summary.categorical_columns.length} categorical
+          <span className="px-2 py-0.5 text-xs rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+            {summary.categorical_columns.length} cat
           </span>
         )}
         {summary.datetime_columns.length > 0 && (
-          <span className="px-3 py-1 text-xs rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
-            {summary.datetime_columns.length} datetime
+          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+            {summary.datetime_columns.length} date
           </span>
         )}
-      </motion.div>
+      </div>
 
       {/* Expandable Columns List */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="glass-light rounded-xl overflow-hidden"
-      >
+      <div className="bg-surface-800/30 rounded-lg overflow-hidden border border-surface-700/30">
         <button
           onClick={() => setShowColumns(!showColumns)}
-          className="w-full px-4 py-3 flex items-center justify-between hover:bg-surface-700/30 transition-colors"
+          className="w-full px-3 py-2 flex items-center justify-between hover:bg-surface-700/30 transition-colors text-left"
         >
-          <span className="text-sm font-medium text-surface-300">
-            Column Details ({summary.columns.length})
+          <span className="text-xs font-medium text-surface-400">
+            Columns ({summary.columns.length})
           </span>
           {showColumns ? (
-            <ChevronUp className="w-4 h-4 text-surface-400" />
+            <ChevronUp className="w-3.5 h-3.5 text-surface-500" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-surface-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-surface-500" />
           )}
         </button>
         
         {showColumns && (
-          <motion.div
-            initial={{ height: 0 }}
-            animate={{ height: 'auto' }}
-            className="border-t border-surface-700/50"
-          >
-            <div className="max-h-60 overflow-y-auto">
-              {summary.columns.map((col, i) => (
-                <div
-                  key={col.name}
-                  className={cn(
-                    'px-4 py-2 flex items-center justify-between text-sm',
-                    i % 2 === 0 ? 'bg-surface-800/30' : ''
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-surface-200">{col.name}</span>
-                    <span className="px-2 py-0.5 text-xs rounded bg-surface-700/50 text-surface-400">
-                      {col.dtype}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-surface-500">
-                    <span>{formatNumber(col.unique_count)} unique</span>
-                    {col.null_count > 0 && (
-                      <span className="text-amber-400">
-                        {col.null_count} null
-                      </span>
-                    )}
-                  </div>
+          <div className="border-t border-surface-700/30 max-h-48 overflow-y-auto">
+            {summary.columns.map((col, i) => (
+              <div
+                key={col.name}
+                className={cn(
+                  'px-3 py-1.5 flex items-center justify-between text-xs',
+                  i % 2 === 0 ? 'bg-surface-800/20' : ''
+                )}
+              >
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="font-mono text-surface-300 truncate" title={col.name}>
+                    {col.name}
+                  </span>
+                  <span className="px-1.5 py-0.5 text-[10px] rounded bg-surface-700/50 text-surface-500 flex-shrink-0">
+                    {col.dtype}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </motion.div>
+                {col.null_count > 0 && (
+                  <span className="text-amber-400 text-[10px] flex-shrink-0 ml-1">
+                    {col.null_count} null
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         )}
-      </motion.div>
+      </div>
 
       {/* Expandable Data Preview */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="glass-light rounded-xl overflow-hidden"
-      >
+      <div className="bg-surface-800/30 rounded-lg overflow-hidden border border-surface-700/30">
         <button
           onClick={() => setShowPreview(!showPreview)}
-          className="w-full px-4 py-3 flex items-center justify-between hover:bg-surface-700/30 transition-colors"
+          className="w-full px-3 py-2 flex items-center justify-between hover:bg-surface-700/30 transition-colors text-left"
         >
-          <span className="text-sm font-medium text-surface-300">
-            Data Preview (first 10 rows)
+          <span className="text-xs font-medium text-surface-400">
+            Preview (first 5 rows)
           </span>
           {showPreview ? (
-            <ChevronUp className="w-4 h-4 text-surface-400" />
+            <ChevronUp className="w-3.5 h-3.5 text-surface-500" />
           ) : (
-            <ChevronDown className="w-4 h-4 text-surface-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-surface-500" />
           )}
         </button>
         
         {showPreview && (
-          <motion.div
-            initial={{ height: 0 }}
-            animate={{ height: 'auto' }}
-            className="border-t border-surface-700/50 overflow-x-auto"
-          >
-            <table className="w-full text-xs">
+          <div className="border-t border-surface-700/30 overflow-x-auto">
+            <table className="w-full text-[10px]">
               <thead className="bg-surface-800/50">
                 <tr>
-                  {summary.columns.slice(0, 8).map((col) => (
+                  {summary.columns.slice(0, 5).map((col) => (
                     <th
                       key={col.name}
-                      className="px-3 py-2 text-left text-surface-400 font-medium whitespace-nowrap"
+                      className="px-2 py-1.5 text-left text-surface-400 font-medium whitespace-nowrap"
                     >
                       {col.name}
                     </th>
                   ))}
-                  {summary.columns.length > 8 && (
-                    <th className="px-3 py-2 text-surface-500">
-                      +{summary.columns.length - 8} more
+                  {summary.columns.length > 5 && (
+                    <th className="px-2 py-1.5 text-surface-500">
+                      +{summary.columns.length - 5}
                     </th>
                   )}
                 </tr>
               </thead>
               <tbody>
-                {summary.head_preview.map((row, i) => (
+                {summary.head_preview.slice(0, 5).map((row, i) => (
                   <tr
                     key={i}
                     className={cn(
@@ -243,25 +199,25 @@ export function DatasetSummary({ summary }: Props) {
                       i % 2 === 0 ? 'bg-surface-800/20' : ''
                     )}
                   >
-                    {summary.columns.slice(0, 8).map((col) => (
+                    {summary.columns.slice(0, 5).map((col) => (
                       <td
                         key={col.name}
-                        className="px-3 py-2 text-surface-300 whitespace-nowrap max-w-[150px] truncate"
+                        className="px-2 py-1 text-surface-300 whitespace-nowrap max-w-[100px] truncate"
+                        title={row[col.name]?.toString()}
                       >
                         {row[col.name]?.toString() ?? '-'}
                       </td>
                     ))}
-                    {summary.columns.length > 8 && (
-                      <td className="px-3 py-2 text-surface-500">...</td>
+                    {summary.columns.length > 5 && (
+                      <td className="px-2 py-1 text-surface-500">...</td>
                     )}
                   </tr>
                 ))}
               </tbody>
             </table>
-          </motion.div>
+          </div>
         )}
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
-

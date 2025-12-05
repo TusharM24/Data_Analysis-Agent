@@ -13,9 +13,9 @@ import { useAppStore } from '../lib/store';
 const SAMPLE_PROMPTS = [
   "Show me a summary of the dataset",
   "What are the correlations between numerical columns?",
-  "Create a histogram of the first numerical column",
+  "Create a histogram of the a numerical column you think is most interesting",
   "Show me the distribution of missing values",
-  "What are the top 10 most frequent values in each categorical column?",
+  "What are the top 10 most frequent values in a categorical column with the most unique values?",
 ];
 
 interface MessageBubbleProps {
