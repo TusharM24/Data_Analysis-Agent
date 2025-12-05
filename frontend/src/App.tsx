@@ -11,6 +11,8 @@ import {
   PanelRightClose,
   PanelLeftOpen,
   PanelRightOpen,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { useState } from 'react';
 import { FileUpload, DatasetSummary, ChatInterface, PlotGallery, VersionSelector } from './components';
@@ -18,7 +20,7 @@ import { useAppStore } from './lib/store';
 import { cn } from './lib/utils';
 
 function App() {
-  const { sessionId, summary, clearSession, clearMessages } = useAppStore();
+  const { sessionId, summary, clearSession, clearMessages, theme, toggleTheme } = useAppStore();
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
 
@@ -31,7 +33,7 @@ function App() {
   };
 
   return (
-    <div className="h-screen bg-surface-950 relative overflow-hidden flex flex-col">
+    <div className={cn("h-screen bg-surface-950 relative overflow-hidden flex flex-col", theme)}>
       {/* Background Effects */}
       <div className="fixed inset-0 pointer-events-none">
         {/* Gradient orbs */}
@@ -88,6 +90,20 @@ function App() {
                   </button>
                 </>
               )}
+              
+              {/* Theme Toggle */}
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg text-surface-500 hover:text-surface-300 hover:bg-surface-800/50 transition-colors"
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-5 h-5" />
+                ) : (
+                  <Moon className="w-5 h-5" />
+                )}
+              </button>
+              
               <a
                 href="https://github.com"
                 target="_blank"

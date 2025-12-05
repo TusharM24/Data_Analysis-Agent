@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { DatasetSummary, ChatMessage, DatasetVersion, VersionDisplayNames } from '../types';
 
+type Theme = 'dark' | 'light';
+
 interface AppStore {
   // Session state
   sessionId: string | null;
@@ -14,6 +16,7 @@ interface AppStore {
   isLoading: boolean;
   isUploading: boolean;
   error: string | null;
+  theme: Theme;
   
   // Plot gallery
   selectedPlotIndex: number;
@@ -26,6 +29,7 @@ interface AppStore {
   
   // Actions
   setSession: (sessionId: string, summary: DatasetSummary, initialVersion?: DatasetVersion) => void;
+  toggleTheme: () => void;
   clearSession: () => void;
   updateSummary: (summary: DatasetSummary) => void;
   
@@ -58,6 +62,7 @@ export const useAppStore = create<AppStore>()(
       isLoading: false,
       isUploading: false,
       error: null,
+      theme: 'dark',
       selectedPlotIndex: 0,
       allPlots: [],
       versions: [],
@@ -104,6 +109,10 @@ export const useAppStore = create<AppStore>()(
       setUploading: (isUploading) => set({ isUploading }),
       setError: (error) => set({ error }),
       
+      toggleTheme: () => set((state) => ({
+        theme: state.theme === 'dark' ? 'light' : 'dark',
+      })),
+      
       addPlots: (plots) => set((state) => ({
         allPlots: [...state.allPlots, ...plots],
         selectedPlotIndex: state.allPlots.length,
@@ -149,9 +158,10 @@ export const useAppStore = create<AppStore>()(
     }),
     {
       name: 'eda-agent-storage',
-      // Only persist display names (user preferences)
+      // Persist user preferences
       partialize: (state) => ({
         versionDisplayNames: state.versionDisplayNames,
+        theme: state.theme,
       }),
     }
   )

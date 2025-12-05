@@ -335,9 +335,9 @@ export function ChatInterface() {
               rows={1}
               className={cn(
                 'w-full px-4 py-3 rounded-xl resize-none',
-                'bg-surface-800/50 border border-surface-700/50',
+                'glass-light border border-surface-700',
                 'text-surface-200 placeholder:text-surface-500',
-                'focus:outline-none focus:border-primary-500/50 focus:ring-2 focus:ring-primary-500/20',
+                'focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
                 'transition-all duration-200'
               )}
