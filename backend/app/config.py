@@ -1,7 +1,9 @@
 """Application configuration settings."""
 import os
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from functools import lru_cache
+from typing import List
 
 
 class Settings(BaseSettings):
@@ -27,11 +29,22 @@ class Settings(BaseSettings):
     # Session Settings
     session_ttl: int = 3600 * 24  # 24 hours
     
-    # CORS
-    cors_origins: list = ["http://localhost:3000", "http://localhost:5173"]
+    # CORS - Parse from environment variable or use defaults
+    cors_origins_str: str = Field(
+        default="http://localhost:3000,http://localhost:5173",
+        alias="CORS_ORIGINS"
+    )
+    
+    @property
+    def cors_origins(self) -> List[str]:
+        """Parse CORS origins from comma-separated string."""
+        if not self.cors_origins_str:
+            return []
+        return [origin.strip() for origin in self.cors_origins_str.split(",") if origin.strip()]
     
     class Config:
         env_file = ".env"
+        populate_by_name = True  # Allow both field name and alias
 
 
 @lru_cache()
@@ -41,4 +54,5 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
+
 
