@@ -11,12 +11,15 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // Proxy is optional now since we use VITE_API_URL
+    // Keeping it for backwards compatibility
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
     },
   },
 })
+
 

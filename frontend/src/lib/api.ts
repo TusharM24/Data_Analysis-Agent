@@ -7,10 +7,12 @@ import type {
   SwitchVersionResponse 
 } from '../types';
 
-const API_BASE = '/api';
+// Use environment variable for API URL, fallback to local development
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_PREFIX = '/api';
 
 const api = axios.create({
-  baseURL: API_BASE,
+  baseURL: `${API_BASE}${API_PREFIX}`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -96,8 +98,14 @@ export async function switchVersion(
 
 // Get plot URL
 export function getPlotUrl(plotPath: string): string {
-  if (plotPath.startsWith('/api/')) {
+  // If it's already a full URL, return as is
+  if (plotPath.startsWith('http://') || plotPath.startsWith('https://')) {
     return plotPath;
   }
-  return `${API_BASE}${plotPath}`;
+  // If it starts with /api/, prepend the base URL
+  if (plotPath.startsWith('/api/')) {
+    return `${API_BASE}${plotPath}`;
+  }
+  // Otherwise, construct the full URL
+  return `${API_BASE}${API_PREFIX}${plotPath}`;
 }

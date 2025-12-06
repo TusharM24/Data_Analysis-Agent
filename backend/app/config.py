@@ -1,9 +1,9 @@
 """Application configuration settings."""
 import os
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import field_validator
 from functools import lru_cache
-from typing import List
+from typing import List, Union
 
 
 class Settings(BaseSettings):
@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     debug: bool = True
     
     # Groq API
-    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+    groq_api_key: str = ""
     groq_model: str = "llama-3.3-70b-versatile"
     
     # File Storage
@@ -29,22 +29,21 @@ class Settings(BaseSettings):
     # Session Settings
     session_ttl: int = 3600 * 24  # 24 hours
     
-    # CORS - Parse from environment variable or use defaults
-    cors_origins_str: str = Field(
-        default="http://localhost:3000,http://localhost:5173",
-        alias="CORS_ORIGINS"
-    )
+    # CORS - Can be a comma-separated string or a list
+    cors_origins: Union[str, List[str]] = "http://localhost:3000,http://localhost:5173"
     
-    @property
-    def cors_origins(self) -> List[str]:
-        """Parse CORS origins from comma-separated string."""
-        if not self.cors_origins_str:
-            return []
-        return [origin.strip() for origin in self.cors_origins_str.split(",") if origin.strip()]
+    @field_validator('cors_origins', mode='before')
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """Parse CORS origins from comma-separated string or list."""
+        if isinstance(v, str):
+            # Split by comma and strip whitespace
+            return [origin.strip() for origin in v.split(",") if origin.strip()]
+        return v
     
     class Config:
         env_file = ".env"
-        populate_by_name = True  # Allow both field name and alias
+        env_prefix = ""  # No prefix for environment variables
 
 
 @lru_cache()
