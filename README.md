@@ -8,6 +8,9 @@ An AI-powered Exploratory Data Analysis agent. Upload your dataset, ask question
 
 > **Note:** The app runs on Render's free tier, so it may take ~30 seconds to wake up on first visit.
 
+<img width="1076" height="707" alt="image" src="https://github.com/user-attachments/assets/808bf68e-cf5b-47e1-ab3e-9126c5de8397" />
+
+
 ---
 
 ## ✨ Features
