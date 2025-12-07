@@ -12,7 +12,7 @@ import {
   Download
 } from 'lucide-react';
 import { cn, formatNumber } from '../lib/utils';
-import { switchVersion } from '../lib/api';
+import { switchVersion, downloadCsv } from '../lib/api';
 import { useAppStore } from '../lib/store';
 import type { DatasetVersion } from '../types';
 
@@ -112,15 +112,16 @@ function VersionItem({ version, isCurrent, onSelect, onRename, displayName }: Ve
                   v{version.version_number} - {displayName}
                 </span>
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <a
-                    href={`http://localhost:8000/api/download/${version.version_id}`}
-                    download
-                    onClick={(e) => e.stopPropagation()}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      downloadCsv(version.version_id, `dataset-v${version.version_number}.csv`);
+                    }}
                     className="p-1 text-surface-500 hover:text-primary-400 transition-colors"
                     title="Download CSV"
                   >
                     <Download className="w-3 h-3" />
-                  </a>
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

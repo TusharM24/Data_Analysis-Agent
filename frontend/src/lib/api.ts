@@ -16,16 +16,27 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 60000, // 60 seconds default timeout
 });
 
-// File upload
-export async function uploadFile(file: File): Promise<UploadResponse> {
+// File upload with progress callback
+export async function uploadFile(
+  file: File, 
+  onProgress?: (percent: number) => void
+): Promise<UploadResponse> {
   const formData = new FormData();
   formData.append('file', file);
 
   const response = await api.post<UploadResponse>('/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
+    },
+    timeout: 300000, // 5 minutes for large file uploads
+    onUploadProgress: (progressEvent) => {
+      if (progressEvent.total && onProgress) {
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percent);
+      }
     },
   });
 
@@ -108,4 +119,55 @@ export function getPlotUrl(plotPath: string): string {
   }
   // Otherwise, construct the full URL
   return `${API_BASE}${API_PREFIX}${plotPath}`;
+}
+
+// Get CSV download URL (for version downloads)
+export function getDownloadUrl(versionId: string): string {
+  return `${API_BASE}${API_PREFIX}/download/${versionId}`;
+}
+
+// Download image as file (handles cross-origin)
+export async function downloadImage(imageUrl: string, filename?: string): Promise<void> {
+  try {
+    // Fetch the image as blob
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+    
+    // Create object URL and trigger download
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || `plot-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    // Fallback: open in new tab if fetch fails
+    window.open(imageUrl, '_blank');
+  }
+}
+
+// Download CSV file
+export async function downloadCsv(versionId: string, filename?: string): Promise<void> {
+  const url = getDownloadUrl(versionId);
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    
+    const downloadUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = filename || `dataset-${versionId}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    window.URL.revokeObjectURL(downloadUrl);
+  } catch (error) {
+    // Fallback: open in new tab
+    window.open(url, '_blank');
+  }
 }

@@ -1,8 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Download, Maximize2, ImageIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Download, Maximize2, ImageIcon, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
-import { getPlotUrl } from '../lib/api';
+import { getPlotUrl, downloadImage } from '../lib/api';
 import { useAppStore } from '../lib/store';
 
 interface FullscreenModalProps {
@@ -11,6 +11,15 @@ interface FullscreenModalProps {
 }
 
 function FullscreenModal({ plotUrl, onClose }: FullscreenModalProps) {
+  const handleDownload = () => {
+    const filename = `plot-${Date.now()}.png`;
+    downloadImage(plotUrl, filename);
+  };
+
+  const handleOpenInNewTab = () => {
+    window.open(plotUrl, '_blank', 'noopener,noreferrer');
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -35,17 +44,28 @@ function FullscreenModal({ plotUrl, onClose }: FullscreenModalProps) {
         <button
           onClick={onClose}
           className="absolute -top-2 -right-2 p-2 rounded-full bg-surface-800 border border-surface-700 text-surface-300 hover:text-white hover:bg-surface-700 transition-colors"
+          title="Close"
         >
           <X className="w-5 h-5" />
         </button>
         
-        <a
-          href={plotUrl}
-          download
-          className="absolute -bottom-2 -right-2 p-2 rounded-full bg-primary-600 text-white hover:bg-primary-500 transition-colors"
-        >
-          <Download className="w-5 h-5" />
-        </a>
+        {/* Download and Open in New Tab buttons */}
+        <div className="absolute -bottom-2 -right-2 flex gap-2">
+          <button
+            onClick={handleOpenInNewTab}
+            className="p-2 rounded-full bg-surface-700 text-white hover:bg-surface-600 transition-colors"
+            title="Open in new tab"
+          >
+            <ExternalLink className="w-5 h-5" />
+          </button>
+          <button
+            onClick={handleDownload}
+            className="p-2 rounded-full bg-primary-600 text-white hover:bg-primary-500 transition-colors"
+            title="Download image"
+          >
+            <Download className="w-5 h-5" />
+          </button>
+        </div>
       </motion.div>
     </motion.div>
   );
@@ -108,17 +128,30 @@ export function PlotGallery() {
                   setFullscreenPlot(getPlotUrl(currentPlot));
                 }}
                 className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors pointer-events-auto"
+                title="View fullscreen"
               >
                 <Maximize2 className="w-5 h-5 text-white" />
               </button>
-              <a
-                href={getPlotUrl(currentPlot)}
-                download
-                onClick={(e) => e.stopPropagation()}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(getPlotUrl(currentPlot), '_blank', 'noopener,noreferrer');
+                }}
                 className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors pointer-events-auto"
+                title="Open in new tab"
+              >
+                <ExternalLink className="w-5 h-5 text-white" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  downloadImage(getPlotUrl(currentPlot), `plot-${selectedPlotIndex + 1}.png`);
+                }}
+                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors pointer-events-auto"
+                title="Download image"
               >
                 <Download className="w-5 h-5 text-white" />
-              </a>
+              </button>
             </div>
           </motion.div>
         </AnimatePresence>

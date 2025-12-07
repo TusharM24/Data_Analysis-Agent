@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileSpreadsheet, AlertCircle, Loader2 } from 'lucide-react';
@@ -8,6 +8,7 @@ import { useAppStore } from '../lib/store';
 
 export function FileUpload() {
   const { setSession, setUploading, setError, isUploading, error } = useAppStore();
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -16,15 +17,29 @@ export function FileUpload() {
       const file = acceptedFiles[0];
       setUploading(true);
       setError(null);
+      setUploadProgress(0);
 
       try {
-        const response = await uploadFile(file);
+        const response = await uploadFile(file, (percent) => {
+          setUploadProgress(percent);
+        });
         setSession(response.session_id, response.summary, response.version);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to upload file';
+        let message = 'Failed to upload file';
+        if (err instanceof Error) {
+          // Check for timeout errors
+          if (err.message.includes('timeout') || err.message.includes('ECONNABORTED')) {
+            message = 'Upload timed out. Please try a smaller file or check your connection.';
+          } else if (err.message.includes('Network Error')) {
+            message = 'Network error. Please check your connection and try again.';
+          } else {
+            message = err.message;
+          }
+        }
         setError(message);
       } finally {
         setUploading(false);
+        setUploadProgress(0);
       }
     },
     [setSession, setUploading, setError]
@@ -81,9 +96,27 @@ export function FileUpload() {
                   <Loader2 className="w-16 h-16 text-primary-400 animate-spin" />
                   <div className="absolute inset-0 blur-xl bg-primary-400/30 animate-pulse" />
                 </div>
-                <p className="text-lg font-medium text-surface-300">
-                  Analyzing your dataset...
-                </p>
+                <div className="text-center">
+                  <p className="text-lg font-medium text-surface-300">
+                    {uploadProgress < 100 ? 'Uploading...' : 'Analyzing your dataset...'}
+                  </p>
+                  {uploadProgress > 0 && uploadProgress < 100 && (
+                    <div className="mt-3 w-48">
+                      <div className="flex justify-between text-xs text-surface-400 mb-1">
+                        <span>Progress</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full h-2 bg-surface-700 rounded-full overflow-hidden">
+                        <motion.div
+                          className="h-full bg-gradient-to-r from-primary-500 to-accent-500"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${uploadProgress}%` }}
+                          transition={{ duration: 0.3 }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </motion.div>
             ) : isDragActive ? (
               <motion.div
