@@ -115,7 +115,7 @@ function VersionItem({ version, isCurrent, onSelect, onRename, displayName }: Ve
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      downloadCsv(version.version_id, `dataset-v${version.version_number}.csv`);
+                      downloadCsv(version.version_id, `${displayName}.csv`);
                     }}
                     className="p-1 text-surface-500 hover:text-primary-400 transition-colors"
                     title="Download CSV"

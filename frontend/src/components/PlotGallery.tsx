@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X, Download, Maximize2, ImageIcon, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Download, Maximize2, ImageIcon } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../lib/utils';
 import { getPlotUrl, downloadImage } from '../lib/api';
@@ -14,10 +14,6 @@ function FullscreenModal({ plotUrl, onClose }: FullscreenModalProps) {
   const handleDownload = () => {
     const filename = `plot-${Date.now()}.png`;
     downloadImage(plotUrl, filename);
-  };
-
-  const handleOpenInNewTab = () => {
-    window.open(plotUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -49,23 +45,13 @@ function FullscreenModal({ plotUrl, onClose }: FullscreenModalProps) {
           <X className="w-5 h-5" />
         </button>
         
-        {/* Download and Open in New Tab buttons */}
-        <div className="absolute -bottom-2 -right-2 flex gap-2">
-          <button
-            onClick={handleOpenInNewTab}
-            className="p-2 rounded-full bg-surface-700 text-white hover:bg-surface-600 transition-colors"
-            title="Open in new tab"
-          >
-            <ExternalLink className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleDownload}
-            className="p-2 rounded-full bg-primary-600 text-white hover:bg-primary-500 transition-colors"
-            title="Download image"
-          >
-            <Download className="w-5 h-5" />
-          </button>
-        </div>
+        <button
+          onClick={handleDownload}
+          className="absolute -bottom-2 -right-2 p-2 rounded-full bg-primary-600 text-white hover:bg-primary-500 transition-colors"
+          title="Download image"
+        >
+          <Download className="w-5 h-5" />
+        </button>
       </motion.div>
     </motion.div>
   );
@@ -131,16 +117,6 @@ export function PlotGallery() {
                 title="View fullscreen"
               >
                 <Maximize2 className="w-5 h-5 text-white" />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(getPlotUrl(currentPlot), '_blank', 'noopener,noreferrer');
-                }}
-                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors pointer-events-auto"
-                title="Open in new tab"
-              >
-                <ExternalLink className="w-5 h-5 text-white" />
               </button>
               <button
                 onClick={(e) => {
