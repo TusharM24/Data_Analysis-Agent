@@ -24,6 +24,43 @@ An AI-powered Exploratory Data Analysis agent. Upload your dataset, ask question
 
 ---
 
+## 🏗️ Architecture
+
+### Code-First Approach
+
+Unlike traditional chatbots that only provide answers, EDA Agent **generates and executes actual Python code** for every analysis. This ensures:
+- **Reproducible results** - All analysis backed by executable code
+- **Transparency** - See exactly what code runs for each query
+- **Flexibility** - Agent can handle any pandas/matplotlib operation
+
+### LangGraph Orchestration Flow
+
+```
+User Query
+    ↓
+1. Query Understanding (classify intent)
+    ↓
+2. Code Generation (write Python code)
+    ↓
+3. Code Validation (safety checks)
+    ↓
+4. Sandbox Execution (run in isolated env)
+    ↓
+5. Error Recovery (retry if failed)
+    ↓
+6. Response Formatting (present results)
+    ↓
+Code + Plots + Explanation
+```
+
+Each step is a LangGraph node, allowing the agent to:
+- Make decisions at each stage
+- Recover from errors automatically
+- Maintain conversation context
+- Generate safe, validated code
+
+---
+
 ## 🛠️ Tech Stack
 
 | Layer | Technologies |
