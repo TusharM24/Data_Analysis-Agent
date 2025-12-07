@@ -168,7 +168,6 @@ export function VersionSelector() {
     switchVersion: storeSwitch,
     renameVersion,
     getVersionDisplayName,
-    setLoading,
     setError,
   } = useAppStore();
 
